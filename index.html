@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MTR 到站時間查詢（非官方）</title>
+  <style>
+    body { 
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; 
+      max-width: 860px; 
+      margin: 0 auto; 
+      padding: 12px; /* 整體減少外邊距 */
+      background: #f8f9fa; 
+      color: #333; 
+      position: relative;
+    }
+    .back-btn {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 6px 12px; /* 按鈕變小 */
+      background: #c8102e;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-weight: bold;
+      cursor: pointer;
+      text-decoration: none;
+      z-index: 100;
+      transition: background 0.2s;
+    }
+    .back-btn:hover { background: #a00d24; }
+    h1 { 
+      color: #c8102e; 
+      text-align: center; 
+      margin-bottom: 0.3em; 
+      margin-top: 50px; 
+      font-size: 1.6rem; /* 標題稍小 */
+    }
+    .subtitle { 
+      text-align: center; 
+      color: #555; 
+      margin-bottom: 1.2em; 
+      font-size: 0.95rem; /* 副標稍小 */
+    }
+    .controls { 
+      display: flex; 
+      flex-wrap: wrap; 
+      gap: 8px; /* 間距減少 */
+      justify-content: center; 
+      margin: 1em 0; 
+    }
+    select, button { 
+      padding: 8px 12px; /* 按鈕內距減少 */
+      font-size: 1rem; 
+      border-radius: 6px; 
+      border: 1px solid #ccc; 
+    }
+    button { 
+      background: #c8102e; 
+      color: white; 
+      border: none; 
+      cursor: pointer; 
+      font-weight: bold; 
+    }
+    button:hover { background: #a00d24; }
+    button:disabled { background: #999; cursor: not-allowed; }
+    .status { 
+      text-align: center; 
+      margin: 0.8em 0; 
+      color: #555; 
+      min-height: 1.2em; 
+      font-size: 0.92rem; 
+    }
+    .route-title { 
+      font-size: 1.4rem; /* 路線標題稍小 */
+      margin: 1em 0 0.4em; 
+      color: #c8102e; 
+      text-align: center; 
+    }
+    .bus-stop { 
+      background: white; 
+      border-radius: 8px; 
+      margin: 0.8em 0; /* 減少區塊間距 */
+      padding: 0.8em; /* 內距減少 */
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08); 
+    }
+    .stop-name { 
+      font-size: 1.15rem; /* 方向標題稍小 */
+      font-weight: 600; 
+      margin: 0.3em 0 0.6em; 
+      color: #222; 
+    }
+    .bus-item { 
+      display: grid; 
+      grid-template-columns: 1.6fr 2.6fr 1fr; /* 稍微壓縮比例 */
+      gap: 6px; 
+      padding: 8px 0; /* 減少垂直內距 */
+      border-bottom: 1px solid #eee; 
+    }
+    .bus-item:last-child { border-bottom: none; }
+    .bus-time { 
+      font-size: 1.25rem; /* 到站時間稍小 */
+      font-weight: bold; 
+      color: #c8102e; 
+    }
+    .bus-info { 
+      color: #555; 
+      font-size: 0.88rem; /* 資訊文字稍小 */
+      line-height: 1.35; 
+    }
+    .plat {
+      background: #c8102e;
+      color: white;
+      padding: 5px 10px; /* 月台標籤稍小 */
+      border-radius: 999px;
+      font-weight: bold;
+      font-size: 0.88rem;
+      text-align: center;
+      align-self: center;
+    }
+    .immediate { color: #d81b60; }
+    .footer-remark { 
+      margin-top: 1.8em; 
+      padding: 0.8em; 
+      background: #fff3cd; 
+      border-radius: 8px; 
+      font-size: 0.88rem; 
+      line-height: 1.4; 
+      color: #664d03; 
+    }
+    .error-msg { 
+      color: #c00; 
+      text-align: center; 
+      margin: 1.5em 0; 
+      font-size: 1rem; 
+    }
+    .no-service { 
+      text-align: center; 
+      color: #888; 
+      font-size: 1rem; 
+      padding: 1.5em 0; 
+    }
+
+    /* 展開按鈕與動畫 */
+    .more-btn-container {
+      text-align: center;
+      margin: 10px 0 0; /* 減少上方間距 */
+    }
+    .more-btn {
+      background: none;
+      border: none;
+      font-size: 1.6rem; /* 箭頭稍小 */
+      cursor: pointer;
+      color: #c8102e;
+      padding: 2px 0;
+      transition: opacity 0.2s;
+    }
+    .more-btn:hover {
+      opacity: 0.7;
+    }
+    .hidden-trains {
+      overflow: hidden;
+      transition: max-height 0.35s ease;
+      max-height: 0;
+    }
+
+    @media (max-width: 560px) { 
+      body { padding: 8px; }
+      h1 { font-size: 1.5rem; margin-top: 45px; }
+      .controls { gap: 6px; }
+      select, button { padding: 7px 10px; font-size: 0.95rem; }
+      .bus-item { 
+        grid-template-columns: 1fr; 
+        gap: 4px; 
+        padding: 7px 0; 
+      }
+      .bus-time { font-size: 1.3rem; margin-bottom: 2px; }
+      .bus-info { font-size: 0.88rem; }
+      .plat { 
+        align-self: start; 
+        padding: 4px 8px; 
+        font-size: 0.85rem; 
+      }
+      .more-btn { font-size: 1.5rem; }
+      .back-btn { 
+        position: fixed; 
+        top: 8px; 
+        left: 8px; 
+        padding: 6px 10px; 
+        font-size: 0.9rem; 
+      }
+    }
+  </style>
+</head>
+<body>
+
+<a href="index.html" class="back-btn">← 返回</a>
+
+<h1>MTR 到站時間查詢</h1>
+<div class="subtitle">即時列車到站時間 ・ 月台標籤顯著化</div>
+
+<div class="controls">
+  <select id="line">
+    <option value="">請選擇路線…</option>
+  </select>
+  <select id="sta" disabled>
+    <option value="">請先選擇路線</option>
+  </select>
+  <button id="btnQuery" disabled>查詢</button>
+  <button id="btnRefresh" disabled>重新整理</button>
+</div>
+
+<div class="status" id="status">請選擇路線及車站</div>
+<div id="result"></div>
+<div class="footer-remark" id="footerRemark" style="display:none"></div>
+
+<script>
+const API_URL = "https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php";
+
+const LINES = {
+  "AEL": { name: "機場快綫", stations: ["HOK","KOW","TSY","AIR","AWE"] },
+  "TCL": { name: "東涌綫", stations: ["HOK","KOW","OLY","NAC","LAK","TSY","SUN","TUC"] },
+  "TML": { name: "屯馬綫", stations: ["WKS","MOS","HEO","TSH","SHM","CIO","STW","CKT","TAW","HIK","DIH","KAT","SUW","TKW","HOM","HUH","ETS","AUS","NAC","MEF","TWW","KSR","YUL","LOP","TIS","SIH","TUM"] },
+  "TKL": { name: "將軍澳綫", stations: ["NOP","QUB","YAT","TIK","TKO","LHP","HAH","POA"] },
+  "EAL": { name: "東鐵綫", stations: ["ADM","EXC","HUH","MKK","KOT","TAW","SHT","FOT","RAC","UNI","TAP","TWO","FAN","SHS","LOW","LMC"] },
+  "SIL": { name: "南港島綫", stations: ["ADM","OCP","WCH","LET","SOH"] },
+  "TWL": { name: "荃灣綫", stations: ["CEN","ADM","TST","JOR","YMT","MOK","PRE","SSP","CSW","LCK","MEF","LAK","KWF","KWH","TWH","TSW"] },
+  "ISL": { name: "港島綫", stations: ["KET","HKU","SYP","SHW","CEN","ADM","WAC","CAB","TIH","FOH","NOP","QUB","TAK","SWH","SKW","HFC","CHW"] },
+  "KTL": { name: "觀塘綫", stations: ["WHA","HOM","YMT","MOK","PRE","SKM","KOT","LOF","WTS","DIH","CHH","KOB","NTK","KWT","LAT","YAT","TIK"] },
+  "DRL": { name: "迪士尼綫", stations: ["SUN","DIS"] }
+};
+
+const STATIONS = {
+  "HOK":"香港站","KOW":"九龍站","TSY":"青衣站","AIR":"機場站","AWE":"亞洲博覽館站",
+  "OLY":"奧運站","NAC":"南昌站","LAK":"荔景站","SUN":"欣澳站","TUC":"東涌站",
+  "WKS":"烏溪沙站","MOS":"馬鞍山站","HEO":"恆安站","TSH":"大水坑站","SHM":"石門站",
+  "CIO":"第一城站","STW":"沙田圍站","CKT":"車公廟站","TAW":"大圍站","HIK":"顯徑站",
+  "DIH":"鑽石山站","KAT":"啟德站","SUW":"宋皇臺站","TKW":"土瓜灣站","HOM":"何文田站",
+  "HUH":"紅磡站","ETS":"尖東站","AUS":"柯士甸站","MEF":"美孚站","TWW":"荃灣西站",
+  "KSR":"錦上路站","YUL":"元朗站","LOP":"朗屏站","TIS":"天水圍站","SIH":"兆康站",
+  "TUM":"屯門站","NOP":"北角站","QUB":"鰂魚涌站","YAT":"油塘站","TIK":"調景嶺站",
+  "TKO":"將軍澳站","LHP":"康城站","HAH":"坑口站","POA":"寶琳站",
+  "ADM":"金鐘站","EXC":"會展站","MKK":"旺角東站","KOT":"九龍塘站","SHT":"沙田站",
+  "FOT":"火炭站","RAC":"馬場站","UNI":"大學站","TAP":"大埔墟站","TWO":"太和站",
+  "FAN":"粉嶺站","SHS":"上水站","LOW":"羅湖站","LMC":"落馬洲站",
+  "OCP":"海洋公園站","WCH":"黃竹坑站","LET":"利東站","SOH":"海怡半島站",
+  "CEN":"中環站","TST":"尖沙咀站","JOR":"佐敦站","YMT":"油麻地站","MOK":"旺角站",
+  "PRE":"太子站","SSP":"深水埗站","CSW":"長沙灣站","LCK":"荔枝角站",
+  "KWF":"葵芳站","KWH":"葵興站","TWH":"大窩口站","TSW":"荃灣站",
+  "KET":"堅尼地城站","HKU":"香港大學站","SYP":"西營盤站","SHW":"上環站","WAC":"灣仔站",
+  "CAB":"銅鑼灣站","TIH":"天后站","FOH":"炮台山站","TAK":"太古站","SWH":"西灣河站",
+  "SKW":"筲箕灣站","HFC":"杏花邨站","CHW":"柴灣站",
+  "WHA":"黃埔站","SKM":"石硤尾站","LOF":"樂富站","WTS":"黃大仙站","CHH":"彩虹站",
+  "KOB":"九龍灣站","NTK":"牛頭角站","KWT":"觀塘站","LAT":"藍田站","DIS":"迪士尼站"
+};
+
+const AUTO_REFRESH_MS = 20000;
+
+const lineSelect = document.getElementById("line");
+const staSelect = document.getElementById("sta");
+const btnQuery = document.getElementById("btnQuery");
+const btnRefresh = document.getElementById("btnRefresh");
+const statusDiv = document.getElementById("status");
+const resultDiv = document.getElementById("result");
+const footerRemark = document.getElementById("footerRemark");
+
+let isQuerying = false;
+let currentLine = "";
+let currentSta = "";
+let autoTimer = null;
+
+function updateButtonState() {
+  const hasLine = lineSelect.value;
+  const hasSta = staSelect.value;
+  staSelect.disabled = !hasLine;
+  btnQuery.disabled = !hasLine || !hasSta || isQuerying;
+  btnRefresh.disabled = isQuerying || !currentLine || !currentSta;
+}
+
+function populateLines() {
+  Object.keys(LINES).forEach(code => {
+    const opt = document.createElement("option");
+    opt.value = code;
+    opt.textContent = LINES[code].name;
+    lineSelect.appendChild(opt);
+  });
+}
+
+function populateStations() {
+  staSelect.innerHTML = '<option value="">請選擇車站…</option>';
+  const line = lineSelect.value;
+  if (!line) return;
+  LINES[line].stations.forEach(code => {
+    const opt = document.createElement("option");
+    opt.value = code;
+    opt.textContent = STATIONS[code] || code;
+    staSelect.appendChild(opt);
+  });
+  updateButtonState();
+}
+
+async function performQuery() {
+  const line = lineSelect.value;
+  const sta = staSelect.value;
+
+  if (!line || !sta) return;
+
+  currentLine = line;
+  currentSta = sta;
+
+  isQuerying = true;
+  updateButtonState();
+  statusDiv.textContent = "正在查詢...";
+  resultDiv.innerHTML = "";
+  footerRemark.style.display = "none";
+
+  try {
+    const url = `${API_URL}?line=${line}&sta=${sta}&lang=TC`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`網絡錯誤 ${res.status}`);
+
+    const json = await res.json();
+
+    if (json.status != 1) {
+      throw new Error(json.message || "API 錯誤（特殊服務安排或無資料）");
+    }
+
+    const dataKeys = Object.keys(json.data || {});
+    if (dataKeys.length === 0) throw new Error("無車站資料");
+
+    const key = dataKeys[0];
+    const block = json.data[key];
+
+    if (!block) throw new Error("無車站資料");
+
+    renderResult(block, line, sta, json);
+    statusDiv.textContent = `最後更新：${json.curr_time || json.sys_time || "—"}`;
+
+    let remark = "";
+    if (json.sys_time) remark += `系統時間：${json.sys_time} `;
+    if (json.curr_time) remark += `當前時間：${json.curr_time} `;
+    if (json.isdelay) {
+      const delayText = json.isdelay === "Y" ? "有延誤" : "正常";
+      remark += `狀態：${delayText}`;
+    }
+    if (json.message && !remark.includes(json.message)) remark += `<br>${json.message}`;
+    if (remark) {
+      footerRemark.innerHTML = remark;
+      footerRemark.style.display = "block";
+    }
+
+    if (autoTimer) clearInterval(autoTimer);
+    autoTimer = setInterval(performQuery, AUTO_REFRESH_MS);
+
+  } catch (err) {
+    console.error(err);
+    resultDiv.innerHTML = `<div class="error-msg">查詢失敗<br>${err.message}</div>`;
+    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  } finally {
+    isQuerying = false;
+    updateButtonState();
+  }
+}
+
+function renderResult(block, lineCode, staCode, json) {
+  const lineName = LINES[lineCode].name;
+  const staName = STATIONS[staCode] || staCode;
+
+  const title = `${lineName} — ${staName} 到站時間`;
+
+  let html = `<h2 class="route-title">${title}</h2>`;
+
+  const directions = [
+    { key: "UP" },
+    { key: "DOWN" }
+  ];
+
+  let hasAnyTrain = false;
+
+  directions.forEach(dir => {
+    const trains = (block[dir.key] || []).slice(0, 10);
+
+    if (trains.length === 0) return;
+
+    hasAnyTrain = true;
+
+    const uniqueDestCodes = [...new Set(trains.map(t => t.dest).filter(d => d))];
+    const uniqueDestNames = uniqueDestCodes
+      .map(code => STATIONS[code] || code)
+      .filter(name => name !== "未知");
+
+    let dirName = uniqueDestNames.length > 0 ? uniqueDestNames.join(' / ') : "未知方向";
+    dirName = `往 ${dirName}`;
+
+    html += `<div class="bus-stop">
+      <div class="stop-name">${dirName}</div>`;
+
+    const visibleTrains = trains.slice(0, 2);
+    const hiddenTrains = trains.slice(2);
+
+    visibleTrains.forEach(t => {
+      let ttnt = Number(t.ttnt || 0);
+      let timeDisplay = "";
+      let isImmediate = false;
+
+      if (ttnt <= 0) {
+        timeDisplay = "即將到站";
+        isImmediate = true;
+      } else {
+        timeDisplay = `${ttnt} 分鐘`;
+      }
+
+      const destName = STATIONS[t.dest] || t.dest || "未知";
+      const fullTime = t.time || "-";
+      const platNum = t.plat || "-";
+
+      html += `
+        <div class="bus-item">
+          <div class="bus-time${isImmediate ? " immediate" : ""}">${timeDisplay}</div>
+          <div class="bus-info">
+            目的地：${destName} | 時間：${fullTime}
+          </div>
+          <div class="plat">月台 ${platNum}</div>
+        </div>`;
+    });
+
+    if (hiddenTrains.length > 0) {
+      html += `<div class="hidden-trains">`;
+      hiddenTrains.forEach(t => {
+        let ttnt = Number(t.ttnt || 0);
+        let timeDisplay = "";
+        let isImmediate = false;
+
+        if (ttnt <= 0) {
+          timeDisplay = "即將到站";
+          isImmediate = true;
+        } else {
+          timeDisplay = `${ttnt} 分鐘`;
+        }
+
+        const destName = STATIONS[t.dest] || t.dest || "未知";
+        const fullTime = t.time || "-";
+        const platNum = t.plat || "-";
+
+        html += `
+          <div class="bus-item">
+            <div class="bus-time${isImmediate ? " immediate" : ""}">${timeDisplay}</div>
+            <div class="bus-info">
+              目的地：${destName}<br>
+              時間：${fullTime}
+            </div>
+            <div class="plat">月台 ${platNum}</div>
+          </div>`;
+      });
+      html += `</div>`;
+
+      html += `
+        <div class="more-btn-container">
+          <button class="more-btn" onclick="toggleMore(this)">▼</button>
+        </div>`;
+    }
+
+    html += `</div>`;
+  });
+
+  if (!hasAnyTrain) {
+    html += `<div class="no-service">
+      暫無即將到站的列車<br>
+      <small>可能為尾班車後或有特別安排</small>
+    </div>`;
+  }
+
+  resultDiv.innerHTML = html;
+}
+
+function toggleMore(btn) {
+  const hiddenDiv = btn.parentNode.previousElementSibling;
+  if (!hiddenDiv || !hiddenDiv.classList.contains('hidden-trains')) return;
+
+  if (hiddenDiv.style.maxHeight === '0px' || !hiddenDiv.style.maxHeight) {
+    hiddenDiv.style.maxHeight = hiddenDiv.scrollHeight + 'px';
+    btn.textContent = '▲';
+  } else {
+    hiddenDiv.style.maxHeight = hiddenDiv.scrollHeight + 'px';
+    requestAnimationFrame(() => {
+      hiddenDiv.style.maxHeight = '0px';
+    });
+    btn.textContent = '▼';
+  }
+}
+
+lineSelect.addEventListener("change", populateStations);
+staSelect.addEventListener("change", updateButtonState);
+btnQuery.addEventListener("click", performQuery);
+btnRefresh.addEventListener("click", performQuery);
+
+populateLines();
+lineSelect.value = "TWL";
+populateStations();
+staSelect.value = "KWF";
+updateButtonState();
+performQuery();
+</script>
+</body>
+</html>
